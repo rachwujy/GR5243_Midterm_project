@@ -80,13 +80,77 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
          <span class="dt">col=</span><span class="kw">cm.colors</span>(<span class="dv">255</span>),    <span class="co"># Select 255 grey levels</span>
          <span class="dt">axes =</span> <span class="ot">FALSE</span>
        )
+}
+
+
+
+create.formula &lt;-<span class="st"> </span><span class="cf">function</span>(outcome.name, input.names, <span class="dt">input.patterns =</span> <span class="ot">NA</span>,<span class="dt">all.data.names =</span> <span class="ot">NA</span>, <span class="dt">return.as =</span> <span class="st">&quot;character&quot;</span>) {
+
+  variable.names.from.patterns &lt;-<span class="st"> </span><span class="kw">c</span>()
+  <span class="cf">if</span> (<span class="op">!</span><span class="kw">is.na</span>(input.patterns[<span class="dv">1</span>]) <span class="op">&amp;</span><span class="st"> </span><span class="op">!</span><span class="kw">is.na</span>(all.data.names[<span class="dv">1</span>])) {
+    pattern &lt;-<span class="st"> </span><span class="kw">paste</span>(input.patterns, <span class="dt">collapse =</span> <span class="st">&quot;|&quot;</span>)
+    variable.names.from.patterns &lt;-<span class="st"> </span>all.data.names[<span class="kw">grep</span>(<span class="dt">pattern =</span> pattern,
+    <span class="dt">x =</span> all.data.names)]  
+  }
+  
+  all.input.names &lt;-<span class="st"> </span><span class="kw">unique</span>(<span class="kw">c</span>(input.names, variable.names.from.patterns))
+  all.input.names &lt;-<span class="st"> </span>all.input.names[all.input.names <span class="op">!=</span>outcome.name]
+
+  <span class="cf">if</span> (<span class="op">!</span><span class="kw">is.na</span>(all.data.names[<span class="dv">1</span>])) {
+    all.input.names &lt;-<span class="st"> </span>all.input.names[all.input.names <span class="op">%in%</span>
+<span class="st">    </span>all.data.names]
+   }
+
+  input.names.delineated &lt;-<span class="st"> </span><span class="kw">sprintf</span>(<span class="st">&quot;`%s`&quot;</span>, all.input.names)
+  the.formula &lt;-<span class="st"> </span><span class="kw">sprintf</span>(<span class="st">&quot;`%s` ~ %s&quot;</span>, outcome.name, <span class="kw">paste</span>(input.names.delineated,<span class="dt">collapse =</span> <span class="st">&quot; + &quot;</span>))
+  
+  <span class="cf">if</span> (return.as <span class="op">==</span><span class="st"> &quot;formula&quot;</span>) {
+     <span class="kw">return</span>(<span class="kw">as.formula</span>(the.formula))
+  }
+  
+  <span class="cf">if</span> (return.as <span class="op">!=</span><span class="st"> &quot;formula&quot;</span>) {
+     <span class="kw">return</span>(the.formula)
+  }
+}
+
+
+create.x.and.y &lt;-<span class="st"> </span><span class="cf">function</span>(the.formula, data) {
+   <span class="kw">require</span>(data.table)
+   <span class="kw">setDT</span>(data)
+   x &lt;-<span class="st"> </span><span class="kw">model.matrix</span>(<span class="dt">object =</span> <span class="kw">as.formula</span>(the.formula),<span class="dt">data =</span> data)
+   y.name &lt;-<span class="st"> </span><span class="kw">trimws</span>(<span class="dt">x =</span> <span class="kw">gsub</span>(<span class="dt">pattern =</span> <span class="st">&quot;`&quot;</span>, <span class="dt">replacement =</span> <span class="st">&quot;&quot;</span>,
+   <span class="dt">x =</span> <span class="kw">strsplit</span>(<span class="dt">x =</span> the.formula, <span class="dt">split =</span> <span class="st">&quot;~&quot;</span>)[[<span class="dv">1</span>]][<span class="dv">1</span>],<span class="dt">fixed =</span> <span class="ot">TRUE</span>))
+   y &lt;-<span class="st"> </span>data[<span class="kw">as.numeric</span>(<span class="kw">rownames</span>(x)), <span class="kw">get</span>(y.name)]
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="dt">x =</span> x, <span class="dt">y =</span> y))
+}
+
+
+score &lt;-<span class="st"> </span><span class="cf">function</span>(data,function_name)
+{
+  FUN &lt;-<span class="st"> </span><span class="kw">match.fun</span>(function_name) 
+  
+  start_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
+  mod &lt;-<span class="st"> </span><span class="kw">FUN</span>(data)
+  end_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
+  
+  size =<span class="st"> </span><span class="kw">nrow</span>(data)
+  
+  A =<span class="st"> </span>size<span class="op">/</span><span class="kw">nrow</span>(train)
+  
+  B =<span class="st"> </span><span class="kw">min</span>(<span class="dv">1</span>,(end_time <span class="op">-</span><span class="st"> </span>start_time)<span class="op">/</span><span class="dv">60</span>)
+
+  C =<span class="st"> </span>mod<span class="op">$</span><span class="st">'C'</span>
+  
+  <span class="kw">return</span>(<span class="kw">data.table</span>(<span class="st">'Sample size'</span>=size,<span class="dt">Data=</span><span class="kw">deparse</span>(<span class="kw">substitute</span>(data)),<span class="dt">A=</span>A,<span class="dt">B=</span>B,<span class="dt">C=</span>C,<span class="dt">score=</span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>A <span class="op">+</span><span class="st"> </span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>B <span class="op">+</span><span class="st"> </span><span class="fl">0.5</span> <span class="op">*</span><span class="st"> </span>C))
 }</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">n.values &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="dv">500</span>, <span class="dv">1000</span>, <span class="dv">2000</span>)
 iterations &lt;-<span class="st"> </span><span class="dv">3</span></code></pre></div>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">train &lt;-<span class="st"> </span><span class="kw">fread</span>(<span class="st">&quot;MNIST-fashion training set-49.csv&quot;</span>)
 test &lt;-<span class="st"> </span><span class="kw">fread</span>(<span class="st">&quot;MNIST-fashion testing set-49.csv&quot;</span>)
+
+<span class="kw">par</span>(<span class="dt">mfrow=</span><span class="kw">c</span>(<span class="dv">3</span>,<span class="dv">3</span>), <span class="dt">mar =</span> <span class="kw">rep</span>(<span class="dv">0</span>, <span class="dv">4</span>)) 
 <span class="kw">lapply</span>(<span class="dv">1</span><span class="op">:</span><span class="dv">9</span>, get_image)<span class="co">#visulization of first 9 images</span></code></pre></div>
-<p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAAZlBMVEWA//+B//+P//+j//+4//++///C///K///S///T///2////gP//gf//i///jv//kP//k///lf//l///nv//n///oP//of//o///pv//qP//q///sP//s///vP//v///wP//0/////9VCZkIAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAG0UlEQVR4nO3SR64WBgxG0ZeQQioppBfI/jfJgKnFwLL0X/LOXYE/6zz9J4V7evQB0ocCVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpTsG+nTbi9s+u+147LMKUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU33KKBf3/bNbT/f9sVtX9721W2f3wYooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooO/767bfb/vltle3/Xjb97f9cxuggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggL7vzW3f3vbDbd/ddjz2p9te3wboFKCAAgoooNsABRRQQAHdBiiggAIK6DZAAQUUUEC3AQoooIACug1QQAEFFNBtgAIKKKCAbgMUUEABBXQboIACCiig2wAFFFBAAd0GKKCAAgroNkABBRRQQLcBCiiggAK6DVBAAQUU0G2AAgoooIBuAxRQQAEFdBuggAIKKKDbAAUUUEAB3QYooIACCug2QAEFFFBAtwEKKKCAAroN0GcP9N/bfrvtj9v+vO34ul9ve3sboIACCiiggAK6DFBAAQUU0G2AAgoooIBuAxRQQAEFdBuggAIKKKDbAAUUUEAB3QYooIACCug2QAEFFFBAtwEKKKCAAroNUEABBRTQbYACCiiggG4DFFBAAQV0G6CAAgoooNsABRRQQAHdBiiggAIK6DZAAQUUUEC3AQoooIACug1QQAEFFNBtgAIKKKCAbgMUUEABBXQboIAC+tEBfXnbMdC/b3t6Tn1yG6CA3gYooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDp/idAH/3GD/fpbY+e8zEH6BSgmQCdAjQToFOAZgJ0CtBMgE4BmgnQKUAzAToFaCZApwDNBOgUoJkAnQI0E6BTgGYCdArQTIBOAZoJ0ClAMwE6BWgmQKcAzQToFKCZAJ0CNBOgU4BmAnQK0EyATgGaCdApQDMBOgVoJkCnAM0E6BSgmQCdAjQToFOAZgJ0CtBMgE4BmgnQKUAzAToFaCZApwDNBOgUoJkAnQI0E6BTgGYCdArQTIBOAZoJ0ClAMwE6BWgmQKcAzQToFKCZAJ0CNBOgU4BmehRQ6TZAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAle4dXctujkal3AgAAAAASUVORK5CYII=" /><!-- --><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAAYFBMVEWA//+G//+J//+M//+N//+w//+y//+3//+5//+8//++///S///h////gP//gv//g///hP//hf//hv//h///iP//i///jP//jf//j///k///n///ov//pv//v///wf////870DxKAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAGlklEQVR4nO3SS04UUBBA0faDjaKg+ANR3P8uHcjQMKhU0tf0uQt4qap3Dr+lcIdTDyA9F6BKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCrdMtDDbi92e73b8rJnFaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKa7lRAr3a73+3Xbhe7HXd7t9vydIACCiiggE4DFFBAAQV0GqCAAgoooNMABRRQQAGdBiiggAIK6DRAAQUUUECnAQoooIACOg1QQAEFFNBpgAIKKKCATgMUUEABBXQaoIACCiig0wAFFFBAAZ0GKKCAAgroNEABBRRQQKcBCiiggAI6DVBAAQUU0GmAAgoooIBOAxRQQAEFdBqggAIKKKDTAAUUUEABnQYooIACCui0UwH9sdvtbp93+7Lbx90+7PZ1N0ABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEAB/dvP3ZZFLR95WdTNbstAv+0GKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAvofAH3YbfnPrnf7tNvysstA73YD9F8BCiiggAI6DVBAAQUU0GmAAgoooIBOAxRQQAEFdBqggAIKKKDTAAUUUEABnQYooIACCug0QAEFFFBApwEKKKCAAjoNUEABBRTQaYACCiiggE4DFFBAAQV0GqCAAgoooNMABRRQQAGdBiiggAIK6DRAAQUUUECnAQoooIACOg1QQAEFFNBpgAIKKKCATgMUUEABBXQaoIACCmgZ6Pvdvu/2uNtxt8vd3u72ZjdAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAX16breXu73abXnZswpQQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTXcqoNJugCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCrdHx6343UGlyW1AAAAAElFTkSuQmCC" /><!-- --><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAAclBMVEWA//+B//+5///Q///X///h///i///q///3///+////gP//gf//g///hP//hv//if//kP//mf//nv//o///sP//vv//v///wP//xP//xf//yv//zP//zv//1P//1f//2P//3P//6f//8P//9f///f////+Ja6bkAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAHEUlEQVR4nO3SV7JQZRBG0WvAQBAjYATT/Kfow/WZ6oeuYtuuPYBT5/96PfwthXv40D8gvS9AlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVumWgD7t9vtuXuy0/9qPdlv9uOUABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU03YcC+sluz3Z7uttvu/2820+7/bUboIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIA+9m63F7t9u9t3u/2426vdft8NUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEAf+2K3r3f7dLdfd/tzt+93e7IboIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCuh/AOjb3Z7u9s1uX+32crdnu/2yG6CAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAPvbxbs93e7HbD7u92e31bn/sBiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiig/35ut892233r9mP/V81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR07fDNCrzUdO3wzQq81HTt8M0KvNR14+mrQaoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEr3D4r/pCgXGcE/AAAAAElFTkSuQmCC" /><!-- --><img src="data:image/png;base64,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" /><!-- --><img src="data:image/png;base64,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" /><!-- --><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAAbFBMVEWA//+B//+C//+G//+R//+T//+d//+g//+j//+s//+1///B///Q///W///Y///a///e///1///5///7////gP//lv//mv//rP//sP//wf//xv//yP//yv//y///zv//0f//2P//6///7/////+7vaI/AAAACXBIWXMAAA7DAAAOwwHHb6hkAAAGeUlEQVR4nO3USU4VABBF0Y+CSqPYY9+x/z06gDGjF/81nLuASlVyUodbKdzh2AtIDwWo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKB6jSAap0gCodoEoHqNIBqnSAKh2gSgeo0gGqdIAqHaBKNwZ62Ha67em28bGPKkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU03bGAXm672vZ227Ntz7edb3uxDVBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBA7/q07WLbq3Svt73b9nsboIACCug0QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkD/AdD3275ve7Pty7aP2z5sG78eQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFND/AOjNtpfbfmz7te3nts/bvm4DFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFNC7rrd92/Zn25Ntp9sut11sAxRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRRQQAEFFFBAAQUUUEABBRTQ+3HbzradbBsf+6gCFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMBCmg6QAFNByig6QAFNB2ggKYDFNB0gAKaDlBA0wEKaDpAAU0HKKDpAAU0HaCApgMU0HSAApoOUEDTAQpoOkABTQcooOkABTQdoICmAxTQdIACmg5QQNMdC6i0DVClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlClA1TpAFU6QJUOUKUDVOkAVTpAlQ5QpQNU6QBVOkCVDlCl+wtSGNMr+tuyMQAAAABJRU5ErkJggg==" /><!-- --><img src="data:image/png;base64,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" /><!-- --><img src="data:image/png;base64,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" /><!-- --><img src="data:image/png;base64,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" /><!-- --></p>
+<p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAqAAAAHgCAMAAABNUi8GAAAB/lBMVEWA//+B//+C//+D//+E//+F//+G//+I//+J//+K//+L//+M//+N//+P//+Q//+R//+T//+V//+X//+Y//+a//+d//+e//+f//+g//+h//+j//+l//+n//+p//+r//+s//+u//+w//+x//+y//+1//+3//+4//+5//+7//+8//++///A///B///C///D///E///H///I///J///K///L///N///P///Q///S///T///W///X///Y///a///b///e///h///i///k///p///q///x///z///1///2///3///5///7///+////gP//gf//gv//g///hP//hf//hv//h///iP//if//iv//i///jP//jf//jv//j///kP//kf//kv//k///lP//lf//lv//l///mP//mf//mv//m///nf//nv//n///oP//of//ov//o///pf//pv//qP//qf//qv//q///rP//r///sP//sf//s///tP//tf//tv//uP//uv//u///vP//vv//v///wP//wf//wv//xP//xf//xv//yP//yf//yv//y///zP//zf//zv//z///0f//0///1P//1f//1v//1///2P//3P//3f//4f//4///5///6P//6f//6///7///8P//8///9f//9///+f//+////f////9o7lXbAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAJmElEQVR4nO3dV8McZRmA4QQlgoqIEMVYsIEK2KixK/YSUEKJJMGIGBERLKixFxIRBAyCGGyoYMm/9B/sfbBm58nndR/vzD4ze71z9u5s27a6XdElUZx+8XZEL46Wnr/6aPTZqM6/PVp3/pP1AUABXRWgpzhAAR0doICODlBARwcooKMDFNDRAQro6AAFdHSAAjo6QAEdHaCAjg5QQEcHKKCjAxTQ0QEK6OgABXR0gAI6OkABHR2ggI4OUEBHB+h0oJ9c3Z7o7uht0ZXRu6NLo93RoeiB6PXRxVHNX8dfG10f1e/7++ix6JHoPxGggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooIACCiiggAIKKKCAAgoooJsBemR134ruiQ5Gd0T7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" /><!-- --></p>
 <pre><code>[[1]]
 NULL
 
@@ -119,7 +183,12 @@ test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</spa
 
 
 train<span class="op">$</span>label &lt;-<span class="st"> </span><span class="kw">as.factor</span>(train<span class="op">$</span>label) <span class="co">#change characters to factors</span>
-test<span class="op">$</span>label &lt;-<span class="st"> </span><span class="kw">as.factor</span>(test<span class="op">$</span>label)</code></pre></div>
+test<span class="op">$</span>label &lt;-<span class="st"> </span><span class="kw">as.factor</span>(test<span class="op">$</span>label)
+
+
+input.names &lt;-<span class="st"> </span><span class="kw">names</span>(test)[<span class="op">-</span><span class="dv">1</span>]
+output.name &lt;-<span class="st"> </span><span class="kw">names</span>(test)[<span class="dv">1</span>]
+formula &lt;-<span class="st"> </span><span class="kw">create.formula</span>(<span class="dt">outcome.name =</span> output.name, <span class="dt">input.names =</span> input.names)</code></pre></div>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co">#Create 9 different size data sets</span>
 <span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span>iterations)
 {
@@ -134,129 +203,123 @@ test<span class="op">$</span>label &lt;-<span class="st"> </span><span class="kw
 <h2>Introduction</h2>
 <div id="model-1-multinomial-logistic-regression" class="section level3">
 <h3>Model 1 Multinomial logistic regression:</h3>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">Multinomial_logistic_regression &lt;-<span class="st"> </span><span class="cf">function</span>(data)
-{
-  regression &lt;-<span class="st"> </span><span class="kw">multinom</span>(data<span class="op">$</span>label<span class="op">~</span>.,<span class="dt">data =</span> data, <span class="dt">trace=</span><span class="ot">FALSE</span>)
-  
-  start_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(<span class="dt">object =</span> regression, <span class="dt">newdata =</span> test)
-  end_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  
-  size =<span class="st"> </span><span class="kw">nrow</span>(data)
-  
-  A =<span class="st"> </span>size<span class="op">/</span><span class="kw">nrow</span>(train)
-  
-  B =<span class="st"> </span><span class="kw">min</span>(<span class="dv">1</span>,(end_time <span class="op">-</span><span class="st"> </span>start_time<span class="op">-</span><span class="dv">60</span>)<span class="op">/</span><span class="dv">60</span>)
-
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">Multinomial_logistic_regression &lt;-<span class="st"> </span><span class="cf">function</span>(data){
+  mod &lt;-<span class="st"> </span><span class="kw">multinom</span>(formula,<span class="dt">data =</span> data, <span class="dt">trace=</span><span class="ot">FALSE</span>)
+  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(<span class="dt">object =</span> mod, <span class="dt">newdata =</span> test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>])
   C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
-  
-  <span class="kw">return</span>(<span class="kw">data.table</span>(<span class="dt">Model=</span><span class="st">'Model 1'</span>,<span class="st">'Sample size'</span>=size,<span class="dt">Data=</span><span class="kw">deparse</span>(<span class="kw">substitute</span>(data)),<span class="dt">A=</span>A,<span class="dt">B=</span>B,<span class="dt">C=</span>C,<span class="dt">score=</span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>A <span class="op">+</span><span class="st"> </span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>B <span class="op">+</span><span class="st"> </span><span class="fl">0.5</span> <span class="op">*</span><span class="st"> </span>C))
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
 }</code></pre></div>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">Multinomial_logistic_regression</span>(dat_500_<span class="dv">1</span>)</code></pre></div>
-<pre><code>     Model Sample size      Data           A         B      C       score
-1: Model 1         500 dat_500_1 0.008333333 -0.999168 0.3183 -0.08855866</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">Multinomial_logistic_regression</span>(dat_1000_<span class="dv">1</span>)</code></pre></div>
-<pre><code>     Model Sample size       Data          A          B      C      score
-1: Model 1        1000 dat_1000_1 0.01666667 -0.9993353 0.2758 -0.1077672</code></pre>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">Multinomial_logistic_regression</span>(dat_2000_<span class="dv">1</span>)</code></pre></div>
-<pre><code>     Model Sample size       Data          A          B      C      score
-1: Model 1        2000 dat_2000_1 0.03333333 -0.9977725 0.2245 -0.1288598</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>,Multinomial_logistic_regression)</code></pre></div>
+<pre><code>   Sample size      Data           A           B      C     score
+1:         500 dat_500_1 0.008333333 0.005768299 0.3183 0.1626754</code></pre>
 </div>
 <div id="model-2-k5-nearest-neighbors" class="section level3">
 <h3>Model 2 K(5)-Nearest Neighbors :</h3>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">K_Nearest_Neighbors &lt;-<span class="st"> </span><span class="cf">function</span>(data,<span class="dt">k=</span><span class="dv">5</span>)
 {
-  
-  
-  start_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
   pred &lt;-<span class="st"> </span><span class="kw">knn</span>(data[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>],<span class="dt">test =</span> test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>],,<span class="dt">cl=</span>data<span class="op">$</span>label,<span class="dt">k=</span>k)
-  end_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  
-  size =<span class="st"> </span><span class="kw">nrow</span>(data)
-  
-  A =<span class="st"> </span>size<span class="op">/</span><span class="kw">nrow</span>(train)
-  
-  B =<span class="st"> </span><span class="kw">min</span>(<span class="dv">1</span>,(end_time <span class="op">-</span><span class="st"> </span>start_time<span class="op">-</span><span class="dv">60</span>)<span class="op">/</span><span class="dv">60</span>)
-
   C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
-  
-  <span class="kw">return</span>(<span class="kw">data.table</span>(<span class="dt">Model=</span><span class="st">'Model 2'</span>,<span class="st">'Sample size'</span>=size,<span class="dt">Data=</span><span class="kw">deparse</span>(<span class="kw">substitute</span>(data)),<span class="dt">A=</span>A,<span class="dt">B=</span>B,<span class="dt">C=</span>C,<span class="dt">score=</span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>A <span class="op">+</span><span class="st"> </span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>B <span class="op">+</span><span class="st"> </span><span class="fl">0.5</span> <span class="op">*</span><span class="st"> </span>C))
+   <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=<span class="ot">NA</span>,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
 }</code></pre></div>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">K_Nearest_Neighbors</span>(dat_1000_<span class="dv">1</span>)</code></pre></div>
-<pre><code>     Model Sample size       Data          A          B      C      score
-1: Model 2        1000 dat_1000_1 0.01666667 -0.9897843 0.2517 -0.1174294</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>,K_Nearest_Neighbors)</code></pre></div>
+<pre><code>   Sample size      Data           A           B      C    score
+1:         500 dat_500_1 0.008333333 0.005402799 0.2751 0.140984</code></pre>
 </div>
 <div id="model-3-classification-tree" class="section level3">
 <h3>Model 3 Classification Tree:</h3>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">testlabel &lt;-<span class="st"> </span><span class="kw">rpart</span>(test<span class="op">$</span>label<span class="op">~</span>.,<span class="dt">data =</span> test,<span class="dt">method =</span> <span class="st">&quot;class&quot;</span>)
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">testlabel &lt;-<span class="st"> </span><span class="kw">rpart</span>(formula,<span class="dt">data =</span> test,<span class="dt">method =</span> <span class="st">&quot;class&quot;</span>)
 
 
 Classification_Tree &lt;-<span class="st"> </span><span class="cf">function</span>(data)
 {
-
-  start_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  reg &lt;-<span class="st"> </span><span class="kw">rpart</span>(data<span class="op">$</span>label<span class="op">~</span>.,<span class="dt">data =</span> data,<span class="dt">method =</span> <span class="st">&quot;class&quot;</span>)
-  pred=<span class="kw">predict</span>(<span class="dt">object =</span> reg, <span class="dt">newdata =</span> test,<span class="dt">type =</span> <span class="st">&quot;vector&quot;</span>)
-  
-  end_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  
-  
-  
-  size =<span class="st"> </span><span class="kw">nrow</span>(data)
-  
-  A =<span class="st"> </span>size<span class="op">/</span><span class="kw">nrow</span>(train)
-  
-  B =<span class="st"> </span><span class="kw">min</span>(<span class="dv">1</span>,(end_time <span class="op">-</span><span class="st"> </span>start_time<span class="op">-</span><span class="dv">60</span>)<span class="op">/</span><span class="dv">60</span>)
-
+  mod &lt;-<span class="st"> </span><span class="kw">rpart</span>(formula,<span class="dt">data =</span> data,<span class="dt">method =</span> <span class="st">&quot;class&quot;</span>)
+  pred=<span class="kw">predict</span>(<span class="dt">object =</span> mod, <span class="dt">newdata =</span> test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>],<span class="dt">type =</span> <span class="st">&quot;vector&quot;</span>)
   C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(testlabel<span class="op">$</span>y<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
-  
-  <span class="kw">return</span>(<span class="kw">data.table</span>(<span class="dt">Model=</span><span class="st">'Model 3'</span>,<span class="st">'Sample size'</span>=size,<span class="dt">Data=</span><span class="kw">deparse</span>(<span class="kw">substitute</span>(data)),<span class="dt">A=</span>A,<span class="dt">B=</span>B,<span class="dt">C=</span>C,<span class="dt">score=</span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>A <span class="op">+</span><span class="st"> </span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>B <span class="op">+</span><span class="st"> </span><span class="fl">0.5</span> <span class="op">*</span><span class="st"> </span>C))
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
 }</code></pre></div>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">Classification_Tree</span>(dat_1000_<span class="dv">1</span>)</code></pre></div>
-<pre><code>     Model Sample size       Data          A          B      C      score
-1: Model 3        1000 dat_1000_1 0.01666667 -0.9969083 0.3324 -0.0788604</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_1000_<span class="dv">1</span>, Classification_Tree)</code></pre></div>
+<pre><code>   Sample size       Data          A           B      C    score
+1:        1000 dat_1000_1 0.01666667 0.003041315 0.3324 0.171127</code></pre>
 </div>
 <div id="model-4-random-forest" class="section level3">
 <h3>Model 4 Random Forest:</h3>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">Random_Forest &lt;-<span class="st"> </span><span class="cf">function</span>(data)
 {
+  mod &lt;-<span class="st"> </span><span class="kw">randomForest</span>(<span class="dt">formula =</span>data<span class="op">$</span>label<span class="op">~</span>.,<span class="dt">data=</span>data)
+  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(<span class="dt">object =</span> mod, <span class="dt">newdata =</span> test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>])
+  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
 
-  start_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  mod.rf &lt;-<span class="st"> </span><span class="kw">randomForest</span>(<span class="dt">formula =</span>data<span class="op">$</span>label<span class="op">~</span>.,<span class="dt">data=</span>data)
-  pred.rf &lt;-<span class="st"> </span><span class="kw">predict</span>(<span class="dt">object =</span> mod.rf, <span class="dt">newdata =</span> test)
-  
-  end_time &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(<span class="kw">Sys.time</span>())
-  
-  
-  
-  size =<span class="st"> </span><span class="kw">nrow</span>(data)
-  
-  A =<span class="st"> </span>size<span class="op">/</span><span class="kw">nrow</span>(train)
-  
-  B =<span class="st"> </span><span class="kw">min</span>(<span class="dv">1</span>,(end_time <span class="op">-</span><span class="st"> </span>start_time<span class="op">-</span><span class="dv">60</span>)<span class="op">/</span><span class="dv">60</span>)
-
-  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred.rf)<span class="op">/</span><span class="kw">nrow</span>(test)
-  
-  <span class="kw">return</span>(<span class="kw">data.table</span>(<span class="dt">Model=</span><span class="st">'Model 4'</span>,<span class="st">'Sample size'</span>=size,<span class="dt">Data=</span><span class="kw">deparse</span>(<span class="kw">substitute</span>(data)),<span class="dt">A=</span>A,<span class="dt">B=</span>B,<span class="dt">C=</span>C,<span class="dt">score=</span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>A <span class="op">+</span><span class="st"> </span><span class="fl">0.25</span> <span class="op">*</span><span class="st"> </span>B <span class="op">+</span><span class="st"> </span><span class="fl">0.5</span> <span class="op">*</span><span class="st"> </span>C))
 }</code></pre></div>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">Random_Forest</span>(dat_1000_<span class="dv">1</span>)</code></pre></div>
-<pre><code>     Model Sample size       Data          A          B      C      score
-1: Model 4        1000 dat_1000_1 0.01666667 -0.9679674 0.2194 -0.1281252</code></pre>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>, Random_Forest)</code></pre></div>
+<pre><code>   Sample size      Data           A          B      C     score
+1:         500 dat_500_1 0.008333333 0.01811765 0.2352 0.1242127</code></pre>
 </div>
-<div id="model-5-ridge-regression" class="section level3">
-<h3>Model 5 Ridge Regression:</h3>
+<div id="model-5-svm" class="section level3">
+<h3>Model 5 svm:</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">Support_Vector_Machines &lt;-<span class="st"> </span><span class="cf">function</span>(data)
+{
+  mod &lt;-<span class="st"> </span><span class="kw">svm</span>(data[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>],data<span class="op">$</span>label)
+  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(mod,test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>])
+  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
+}</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>, Support_Vector_Machines)</code></pre></div>
+<pre><code>   Sample size      Data           A          B      C     score
+1:         500 dat_500_1 0.008333333 0.01220303 0.2512 0.1307341</code></pre>
 </div>
-<div id="model-6" class="section level3">
-<h3>Model 6</h3>
+<div id="model-6-linear-discriminant-analysis" class="section level3">
+<h3>Model 6 Linear Discriminant Analysis:</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">Linear_Discriminant_Analysis &lt;-<span class="st"> </span><span class="cf">function</span>(data)
+{
+  mod &lt;-<span class="st"> </span><span class="kw">lda</span>(label<span class="op">~</span>., <span class="dt">data=</span>data)
+  predictions &lt;-<span class="st"> </span><span class="kw">predict</span>(mod, test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>])
+  pred &lt;-<span class="st"> </span>predictions<span class="op">$</span>class
+  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
+}</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>, Linear_Discriminant_Analysis)</code></pre></div>
+<pre><code>   Sample size      Data           A           B      C     score
+1:         500 dat_500_1 0.008333333 0.001196686 0.2568 0.1307825</code></pre>
 </div>
-<div id="model-7" class="section level3">
-<h3>Model 7</h3>
+<div id="model-7-partial-least-squares-discriminant-analysis" class="section level3">
+<h3>Model 7 Partial Least Squares Discriminant Analysis:</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">Partial_Least_Squares &lt;-<span class="st"> </span><span class="cf">function</span>(data)
+{
+  mod &lt;-<span class="st"> </span><span class="kw">plsda</span>(data[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>], data<span class="op">$</span>label, <span class="dt">probMethod=</span><span class="st">&quot;Bayes&quot;</span>)
+  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(mod, test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>])
+  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
+}</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>, Partial_Least_Squares)</code></pre></div>
+<pre><code>   Sample size      Data           A         B    C     score
+1:         500 dat_500_1 0.008333333 0.5687629 0.47 0.3792741</code></pre>
 </div>
-<div id="model-8" class="section level3">
-<h3>Model 8</h3>
+<div id="model-8-naivebayes" class="section level3">
+<h3>Model 8 naiveBayes:</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">nb &lt;-<span class="st"> </span><span class="cf">function</span>(data)
+{
+  mod &lt;-<span class="st"> </span><span class="kw">naiveBayes</span>(label<span class="op">~</span>., <span class="dt">data=</span>data)
+  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(mod, test[,<span class="dv">2</span><span class="op">:</span><span class="dv">50</span>])
+  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
+}</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>,nb)</code></pre></div>
+<pre><code>   Sample size      Data           A         B      C     score
+1:         500 dat_500_1 0.008333333 0.1404251 0.3787 0.2265396</code></pre>
 </div>
-<div id="model-9" class="section level3">
-<h3>Model 9</h3>
+<div id="model-9-neural-networks" class="section level3">
+<h3>Model 9 Neural Networks:</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">nn &lt;-<span class="st"> </span><span class="cf">function</span>(data)
+{
+  mod &lt;-<span class="st"> </span><span class="kw">nnet</span>(label <span class="op">~</span><span class="st"> </span>., <span class="dt">data =</span> data, <span class="dt">size =</span> <span class="dv">2</span>, <span class="dt">rang =</span> <span class="fl">0.1</span>,<span class="dt">decay =</span> <span class="fl">5e-4</span>, <span class="dt">maxit =</span> <span class="dv">200</span>, <span class="dt">trace =</span>F)
+  pred &lt;-<span class="st"> </span><span class="kw">predict</span>(mod, test[,<span class="op">-</span><span class="dv">1</span>], <span class="dt">type =</span> <span class="st">&quot;class&quot;</span>)
+  C =<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">sum</span>(test<span class="op">$</span>label<span class="op">==</span>pred)<span class="op">/</span><span class="kw">nrow</span>(test)
+  <span class="kw">return</span>(<span class="kw">list</span>(<span class="st">'Model'</span>=mod,<span class="st">'Prediction'</span>=pred,<span class="st">'C'</span>=C))
+}</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">score</span>(dat_500_<span class="dv">1</span>,nn)</code></pre></div>
+<pre><code>   Sample size      Data           A           B      C     score
+1:         500 dat_500_1 0.008333333 0.005686017 0.4091 0.2080548</code></pre>
 </div>
 <div id="model-10" class="section level3">
 <h3>Model 10</h3>
