@@ -1,0 +1,540 @@
+---
+title: "Applied Data Science:  Midterm Project"
+author: ""
+date: ""
+output:
+  prettydoc::html_pretty:
+  theme: cayman
+highlight: github
+---
+
+```{r setup, include=FALSE}
+set.seed(72)
+knitr::opts_chunk$set(echo = TRUE, comment="", warning = FALSE, message = FALSE, tidy.opts=list(width.cutoff=55))
+```
+
+```{r libraries, echo = FALSE}
+library(data.table)
+library(DT)
+library(Formula)
+library(glmnet)
+library(caret)
+library(dplyr)
+library(randomForest)
+library(nnet)
+library(class)
+library(rpart)
+library(e1071)
+library(gbm)
+library(dplyr)
+library(MASS)
+library(klaR)
+```
+
+```{r source_files}
+
+```
+
+```{r functions}
+get_image <- function(x) {image(
+         matrix(unlist(train[x,-1]),ncol = 7,byrow = T),
+         col=cm.colors(255),    # Select 255 grey levels
+         axes = FALSE
+       )
+}
+
+
+
+create.formula <- function(outcome.name, input.names, input.patterns = NA,all.data.names = NA, return.as = "character") {
+
+  variable.names.from.patterns <- c()
+  if (!is.na(input.patterns[1]) & !is.na(all.data.names[1])) {
+    pattern <- paste(input.patterns, collapse = "|")
+    variable.names.from.patterns <- all.data.names[grep(pattern = pattern,
+    x = all.data.names)]  
+  }
+  
+  all.input.names <- unique(c(input.names, variable.names.from.patterns))
+  all.input.names <- all.input.names[all.input.names !=outcome.name]
+
+  if (!is.na(all.data.names[1])) {
+    all.input.names <- all.input.names[all.input.names %in%
+    all.data.names]
+   }
+
+  input.names.delineated <- sprintf("`%s`", all.input.names)
+  the.formula <- sprintf("`%s` ~ %s", outcome.name, paste(input.names.delineated,collapse = " + "))
+  
+  if (return.as == "formula") {
+     return(as.formula(the.formula))
+  }
+  
+  if (return.as != "formula") {
+     return(the.formula)
+  }
+}
+
+
+create.x.and.y <- function(the.formula, data) {
+   require(data.table)
+   setDT(data)
+   x <- model.matrix(object = as.formula(the.formula),data = data)
+   y.name <- trimws(x = gsub(pattern = "`", replacement = "",
+   x = strsplit(x = the.formula, split = "~")[[1]][1],fixed = TRUE))
+   y <- data[as.numeric(rownames(x)), get(y.name)]
+  return(list(x = x, y = y))
+}
+
+
+score <- function(data,function_name,i)
+{
+  FUN <- match.fun(function_name) 
+  
+  start_time <- as.numeric(Sys.time())
+  mod <- FUN(data)
+  end_time <- as.numeric(Sys.time())
+  
+  size = nrow(data)
+  
+  A = size/nrow(train)
+  
+  B = min(1,(end_time - start_time)/60)
+
+  C = mod$'C'
+  
+  return(data.table("Model"=paste("Model",i,sep=" "),'Sample size'=size,Data=deparse(substitute(data)),A=A,B=B,
+                    C=C,score=0.25 * A + 0.25 * B + 0.5 * C,4))
+}
+```
+
+```{r constants}
+n.values <- c(500, 1000, 2000)
+iterations <- 3
+```
+
+```{r load_data}
+train <- fread("MNIST-fashion training set-49.csv")
+test <- fread("MNIST-fashion testing set-49.csv")
+
+par(mfrow=c(3,3), mar = rep(0, 4)) 
+lapply(1:9, get_image)#visulization of first 9 images
+```
+
+```{r clean_data}
+train[,2:50] <-  train[,2:50]/255
+test[,2:50] <- test[,2:50]/255
+
+
+train$label <- as.factor(train$label) #change characters to factors
+test$label <- as.factor(test$label)
+
+
+input.names <- names(test)[-1]
+output.name <- names(test)[1]
+formula <- create.formula(outcome.name = output.name, input.names = input.names)
+```
+
+```{r generate_samples}
+for (i in 1:iterations)
+{
+  for (j in n.values)
+  {
+    nam <- paste("dat", j,i, sep = "_")
+    assign(nam, sample_n(train, j))
+
+  }
+}
+```
+
+## Introduction
+
+### 1.1 Goal
+This project will focus on generating various predictive classifications regarding an image recognition problem. Data for this project came from the MNIST Fashion database (https://github.com/zalandoresearch/fashion-mnist), which contained a large number of images for different types of apparel. In order to proceed the problem, data were divided into a training set (with 60,000 rows), and a testing set (with 10,000 rows of data). 
+
+The main goal for this project is to determine the best machine learning model for classifying the types of apparel of the testing set based upon the data of the training set. In order to achieve this goal, we will be building and assessing the
+performances of the following 10 models:
+
+* Multinomial Logistic Regression
+* K-Nearest Neighbors with K=5
+* K-Nearest Neighbors with K=3
+* Classification Tree
+* Random Forest
+* SVM
+* Linear Discriminant Analysis
+* Partial Least Squares Regression
+* Naive Bayes
+* Neural Networks
+
+
+### 1.2 Evaluation
+As we go through this project, we will be able to answer how small of a sample size  we need to generate the “best” predictions, and the amount of time it takes for the computer to get to the optimal results. One way to quantify the performance of each classification model is to introduce a scoring function: 
+$$Points = 0.25 * A + 0.25 * B + 0.5 * C$$, where A is the sample size proportion, B is the running time, and C represents the misclassification rate
+
+We will further divide the whole training set into 3 different sample sizes (500, 1000, 2000), and for each sample size we will randomly sample 3 datasets, resulting in a total number of 9 training sets. We will then evaluate each model's performance over the 9 training sets. 
+
+
+
+
+### Model 1:  Multinomial logistic regression
+
+We first consider the multinomial logistic regression [...]
+how it works:
+advantages and disadvantages:
+```{r code_model1_development, eval = TRUE}
+Multinomial_logistic_regression <- function(data){
+  mod <- multinom(formula,data = data, trace=FALSE)
+  pred <- predict(object = mod, newdata = test[,2:50])
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=NA,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model1}
+table_log<-rbind(
+        score(dat_500_1,Multinomial_logistic_regression,1),
+        score(dat_500_2,Multinomial_logistic_regression,1),
+        score(dat_500_3,Multinomial_logistic_regression,1),
+        score(dat_1000_1,Multinomial_logistic_regression,1),
+        score(dat_1000_2,Multinomial_logistic_regression,1),
+        score(dat_1000_3,Multinomial_logistic_regression,1),
+        score(dat_2000_1,Multinomial_logistic_regression,1),
+        score(dat_2000_2,Multinomial_logistic_regression,1),
+        score(dat_2000_3,Multinomial_logistic_regression,1))
+
+
+table_log_sum<-table_log[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_log_sum)
+```
+
+### Model 2: K(5)-Nearest Neighbors 
+
+Our second model is the K-nearest Neighbors with K=5[...]
+how it works:
+advantages and disadvantages:
+```{r code_model2_development, eval = TRUE}
+K_Nearest_Neighbors5 <- function(data,k=5)
+{
+  pred <- knn(data[,2:50],test = test[,2:50],cl=data$label,k=k)
+  C = 1-sum(test$label==pred)/nrow(test)
+   return(list('Model'="Model 1",'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model2}
+table_k5<-rbind(score(dat_500_1,K_Nearest_Neighbors5,2),
+        score(dat_500_2,K_Nearest_Neighbors5,2),
+        score(dat_500_3,K_Nearest_Neighbors5,2),
+        score(dat_1000_1,K_Nearest_Neighbors5,2),
+        score(dat_1000_2,K_Nearest_Neighbors5,2),
+        score(dat_1000_3,K_Nearest_Neighbors5,2),
+        score(dat_2000_1,K_Nearest_Neighbors5,2),
+        score(dat_2000_2,K_Nearest_Neighbors5,2),
+        score(dat_2000_3,K_Nearest_Neighbors5,2))
+
+
+table_k5_sum<-table_k5[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_k5_sum)
+```
+
+### Model 3: K(3)-Nearest Neighbors 
+
+Our third model is the K-nearest Neighbors with K=3, [...]
+how it works:
+advantages and disadvantages:
+```{r code_model3_development, eval = TRUE}
+K_Nearest_Neighbors3 <- function(data,k=3)
+{
+  pred <- knn(data[,2:50],test = test[,2:50],cl=data$label,k=k)
+  C = 1-sum(test$label==pred)/nrow(test)
+   return(list('Model'=NA,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model3}
+table_k3<-rbind(score(dat_500_1,K_Nearest_Neighbors3,3),
+        score(dat_500_2,K_Nearest_Neighbors3,3),
+        score(dat_500_3,K_Nearest_Neighbors3,3),
+        score(dat_1000_1,K_Nearest_Neighbors3,3),
+        score(dat_1000_2,K_Nearest_Neighbors3,3),
+        score(dat_1000_3,K_Nearest_Neighbors3,3),
+        score(dat_2000_1,K_Nearest_Neighbors3,3),
+        score(dat_2000_2,K_Nearest_Neighbors3,3),
+        score(dat_2000_3,K_Nearest_Neighbors3,3))
+
+table_k3_sum<-table_k3[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_k3_sum)
+```
+
+
+### Model 4:  Classification Tree
+
+We now consider the classification tree, ...
+how it works:
+advantages and disadvantages:
+
+```{r code_model4_development, eval = TRUE}
+testlabel <- rpart(formula,data = test,method = "class")
+
+
+Classification_Tree <- function(data)
+{
+  mod <- rpart(formula,data = data,method = "class")
+  pred=predict(object = mod, newdata = test[,2:50],type = "vector")
+  C = 1-sum(testlabel$y==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model4}
+table_ct<-rbind(score(dat_500_1,Classification_Tree,4),
+        score(dat_500_2,Classification_Tree,4),
+        score(dat_500_3,Classification_Tree,4),
+        score(dat_1000_1,Classification_Tree,4),
+        score(dat_1000_2,Classification_Tree,4),
+        score(dat_1000_3,Classification_Tree,4),
+        score(dat_2000_1,Classification_Tree,4),
+        score(dat_2000_2,Classification_Tree,4),
+        score(dat_2000_3,Classification_Tree,4))
+
+table_ct_sum<-table_ct[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_ct_sum)
+```
+
+### Model 5: Random_Forest
+
+This part talks about the random forest model, ...
+how it works:
+advantages and disadvantages:
+```{r code_model5_development, eval = TRUE}
+Random_Forest <- function(data)
+{
+  mod <- randomForest(formula =data$label~.,data=data)
+  pred <- predict(object = mod, newdata = test[,2:50])
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+
+}
+```
+
+```{r load_model5}
+table_rf<-rbind(score(dat_500_1,Random_Forest,5),
+        score(dat_500_2,Random_Forest,5),
+        score(dat_500_3,Random_Forest,5),
+        score(dat_1000_1,Random_Forest,5),
+        score(dat_1000_2,Random_Forest,5),
+        score(dat_1000_3,Random_Forest,5),
+        score(dat_2000_1,Random_Forest,5),
+        score(dat_2000_2,Random_Forest,5),
+        score(dat_2000_3,Random_Forest,5))
+
+table_rf_sum<-table_rf[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_rf_sum)
+```
+
+### Model 6: SVM
+
+Next, we consider the SVM model,...
+how it works:
+advantages and disadvantages:
+
+```{r code_model6_development, eval = TRUE}
+Support_Vector_Machines <- function(data)
+{
+  mod <- svm(data[,2:50],data$label)
+  pred <- predict(mod,test[,2:50])
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model6}
+table_svm<-rbind(score(dat_500_1,Support_Vector_Machines,6),
+        score(dat_500_2,Support_Vector_Machines,6),
+        score(dat_500_3,Support_Vector_Machines,6),
+        score(dat_1000_1,Support_Vector_Machines,6),
+        score(dat_1000_2,Support_Vector_Machines,6),
+        score(dat_1000_3,Support_Vector_Machines,6),
+        score(dat_2000_1,Support_Vector_Machines,6),
+        score(dat_2000_2,Support_Vector_Machines,6),
+        score(dat_2000_3,Support_Vector_Machines,6))
+
+table_svm_sum<-table_svm[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_svm_sum)
+```
+
+### Model 7: Linear Discriminant Analysis
+
+A LDA is then performed, ...
+how it works:
+advantages and disadvantages:
+
+```{r code_model7_development, eval = TRUE}
+Linear_Discriminant_Analysis <- function(data)
+{
+  mod <- lda(label~., data=data)
+  predictions <- predict(mod, test[,2:50])
+  pred <- predictions$class
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model7}
+table_lda<-rbind(score(dat_500_1,Linear_Discriminant_Analysis,7),
+        score(dat_500_2,Linear_Discriminant_Analysis,7),
+        score(dat_500_3,Linear_Discriminant_Analysis,7),
+        score(dat_1000_1,Linear_Discriminant_Analysis,7),
+        score(dat_1000_2,Linear_Discriminant_Analysis,7),
+        score(dat_1000_3,Linear_Discriminant_Analysis,7),
+        score(dat_2000_1,Linear_Discriminant_Analysis,7),
+        score(dat_2000_2,Linear_Discriminant_Analysis,7),
+        score(dat_2000_3,Linear_Discriminant_Analysis,7))
+
+table_lda_sum<-table_lda[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_lda_sum)
+```
+
+### Model 8: Partial Least Squares Discriminant Analysis
+
+Our model 7 is the partial least squares model, ...
+how it works:
+advantages and disadvantages:
+
+
+```{r code_model8_development, eval = TRUE}
+Partial_Least_Squares <- function(data)
+{
+  mod <- plsda(data[,2:50], data$label, probMethod="Bayes")
+  pred <- predict(mod, test[,2:50])
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model8}
+table_pls<-rbind(score(dat_500_1,Partial_Least_Squares,8),
+        score(dat_500_2,Partial_Least_Squares,8),
+        score(dat_500_3,Partial_Least_Squares,8),
+        score(dat_1000_1,Partial_Least_Squares,8),
+        score(dat_1000_2,Partial_Least_Squares,8),
+        score(dat_1000_3,Partial_Least_Squares,8),
+        score(dat_2000_1,Partial_Least_Squares,8),
+        score(dat_2000_2,Partial_Least_Squares,8),
+        score(dat_2000_3,Partial_Least_Squares,8))
+
+table_pls_sum<-table_pls[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_pls_sum)
+```
+
+### Model 9: Naive Bayes
+
+We then consider the naive bayes model,...
+
+how it works:
+advantages and disadvantages:
+
+
+```{r code_model9_development, eval = TRUE}
+nb <- function(data)
+{
+  mod <- naiveBayes(label~., data=data)
+  pred <- predict(mod, test[,2:50])
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model9}
+table_nb<-rbind(score(dat_500_1,nb,9),
+        score(dat_500_2,nb,9),
+        score(dat_500_3,nb,9),
+        score(dat_1000_1,nb,9),
+        score(dat_1000_2,nb,9),
+        score(dat_1000_3,nb,9),
+        score(dat_2000_1,nb,9),
+        score(dat_2000_2,nb,9),
+        score(dat_2000_3,nb,9))
+
+table_nb_sum<-table_nb[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_nb_sum)
+```
+
+### Model 10: Neural Networks
+
+We then perform the neural networks...
+how it works:
+advantages and disadvantages:
+
+
+```{r code_model10_development, eval = TRUE}
+nn <- function(data)
+{
+  mod <- nnet(label ~ ., data = data, size = 2, rang = 0.1,decay = 5e-4, maxit = 200, trace =F)
+  pred <- predict(mod, test[,-1], type = "class")
+  C = 1-sum(test$label==pred)/nrow(test)
+  return(list('Model'=mod,'Prediction'=pred,'C'=C))
+}
+```
+
+```{r load_model10}
+table_nn<-rbind(score(dat_500_1,nn,10),
+        score(dat_500_2,nn,10),
+        score(dat_500_3,nn,10),
+        score(dat_1000_1,nn,10),
+        score(dat_1000_2,nn,10),
+        score(dat_1000_3,nn,10),
+        score(dat_2000_1,nn,10),
+        score(dat_2000_2,nn,10),
+        score(dat_2000_3,nn,10))
+
+table_nn_sum<-table_nn[,list(A=round(mean(A),4),B=round(mean(B),4),
+       C=round(mean(C),4),Points=round(mean(score),4)),by=c("Model","`Sample size`")]
+
+
+datatable(table_nn_sum)
+```
+
+
+## Scoreboard
+
+```{r scoreboard}
+alltable<-rbind(table_log_sum,table_k5_sum,table_k3_sum,
+                table_ct_sum, table_rf_sum,table_svm_sum,
+                table_lda_sum, table_pls_sum, table_nb_sum,table_nn_sum)
+
+datatable(alltable[order(Points),])
+```
+
+## Discussion
+
+
+## References
+
+
